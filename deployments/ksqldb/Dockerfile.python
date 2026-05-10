@@ -1,0 +1,28 @@
+FROM python:3.9-slim
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python packages
+RUN pip3 install \
+    kafka-python \
+    requests \
+    pyyaml \
+    rosbags \
+    avro \
+    websocket-client \
+    shapely \
+    utm
+
+# Directories
+RUN mkdir -p /scripts /bags
+
+# Working directory
+WORKDIR /scripts
+
+# Keep container running
+CMD ["/bin/bash", "-c", "tail -f /dev/null"]

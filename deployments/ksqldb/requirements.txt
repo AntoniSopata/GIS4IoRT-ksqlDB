@@ -1,0 +1,17 @@
+# API Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.7.4
+pydantic-settings==2.5.0
+httpx==0.28.1
+
+# Kafka
+aiokafka==0.10.0
+
+# WebSockets
+websockets==12.0
+
+# ROSbag
+numpy==1.24.3
+shapely==2.0.2
+rosbags==0.10.5

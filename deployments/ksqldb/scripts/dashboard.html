@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIS4IoRT Monitoring Dashboard</title>
+    <style>
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+        }
+        
+        body { 
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #111;
+            border: 1px solid #333;
+        }
+        
+        h1 { 
+            color: #00ff00; 
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 15px;
+            height: calc(100vh - 150px);
+        }
+        
+        .panel {
+            background: #000;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            padding: 10px 15px;
+            background: #111;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .panel-title {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .panel-controls {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status.connected { background: #00ff00; }
+        .status.disconnected { background: #ff0000; }
+        
+        input {
+            background: #000;
+            border: 1px solid #333;
+            color: #00ff00;
+            padding: 3px 8px;
+            font-family: inherit;
+            font-size: 11px;
+            width: 120px;
+        }
+        
+        button {
+            background: #222;
+            border: 1px solid #444;
+            color: #00ff00;
+            padding: 3px 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #333;
+            border-color: #00ff00;
+        }
+        
+        button:active {
+            background: #111;
+        }
+        
+        .console {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        
+        .console-line {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-left: 3px solid #333;
+        }
+        
+        .console-line.alert {
+            background: #1a0000;
+            border-left-color: #ff0000;
+            color: #ff6666;
+        }
+        
+        .console-line.info {
+            color: #00ff00;
+            border-left-color: #00ff00;
+        }
+        
+        .console-line.warning {
+            color: #ffaa00;
+            border-left-color: #ffaa00;
+        }
+        
+        .timestamp {
+            color: #666;
+            font-size: 10px;
+            margin-right: 5px;
+        }
+        
+        /* Panel-specific colors */
+        .speed .panel-title { color: #00aaff; }
+        .speed .console-line { border-left-color: #00aaff; }
+        
+        .geofence .panel-title { color: #ff9900; }
+        .geofence .console-line { border-left-color: #ff9900; }
+        
+        .humidity .panel-title { color: #00ffff; }
+        .humidity .console-line { border-left-color: #00ffff; }
+        
+        .collision .panel-title { color: #ff00ff; }
+        .collision .console-line { border-left-color: #ff00ff; }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #000;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GIS4IoRT MONITORING DASHBOARD</h1>
+            <div class="subtitle">Real-time WebSocket Monitor: Speed | Geofence | Humidity | Collision</div>
+        </header>
+        
+        <div class="grid">
+            <!-- SPEED PANEL -->
+            <div class="panel speed">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span class="status disconnected" id="speedStatus"></span>
+                        SPEED MONITORING
+                    </div>
+                    <div class="panel-controls">
+                        <input type="text" id="speedConfig" value="speed1" placeholder="Config">
+                        <button onclick="connect('speed')">CONNECT</button>
+                        <button onclick="subscribe('speed')">SUB</button>
+                        <button onclick="disconnect('speed')">DISC</button>
+                    </div>
+                </div>
+                <div class="console" id="speedConsole"></div>
+            </div>
+            
+            <!-- GEOFENCE PANEL -->
+            <div class="panel geofence">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span class="status disconnected" id="geofenceStatus"></span>
+                        GEOFENCE MONITORING
+                    </div>
+                    <div class="panel-controls">
+                        <input type="text" id="geofenceConfig" value="geo1" placeholder="Config">
+                        <button onclick="connect('geofence')">CONNECT</button>
+                        <button onclick="subscribe('geofence')">SUB</button>
+                        <button onclick="disconnect('geofence')">DISC</button>
+                    </div>
+                </div>
+                <div class="console" id="geofenceConsole"></div>
+            </div>
+            
+            <!-- HUMIDITY PANEL -->
+            <div class="panel humidity">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span class="status disconnected" id="humidityStatus"></span>
+                        HUMIDITY MONITORING
+                    </div>
+                    <div class="panel-controls">
+                        <input type="text" id="humidityConfig" value="global" placeholder="Config" readonly>
+                        <button onclick="connect('humidity')">CONNECT</button>
+                        <button onclick="subscribe('humidity')">SUB</button>
+                        <button onclick="disconnect('humidity')">DISC</button>
+                    </div>
+                </div>
+                <div class="console" id="humidityConsole"></div>
+            </div>
+            
+            <!-- COLLISION PANEL -->
+            <div class="panel collision">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span class="status disconnected" id="collisionStatus"></span>
+                        COLLISION DETECTION
+                    </div>
+                    <div class="panel-controls">
+                        <input type="text" id="collisionConfig" value="global" placeholder="Config" readonly>
+                        <button onclick="connect('collision')">CONNECT</button>
+                        <button onclick="subscribe('collision')">SUB</button>
+                        <button onclick="disconnect('collision')">DISC</button>
+                    </div>
+                </div>
+                <div class="console" id="collisionConsole"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const WS_URL = "ws://localhost:8000/ksqldb/ws";
+        const sockets = {
+            speed: null,
+            geofence: null,
+            humidity: null,
+            collision: null
+        };
+
+        function connect(type) {
+            if (sockets[type] && sockets[type].readyState === WebSocket.OPEN) {
+                log(type, "Already connected", "info");
+                return;
+            }
+
+            log(type, `Connecting to ${WS_URL}...`, "info");
+            
+            const ws = new WebSocket(WS_URL);
+            sockets[type] = ws;
+
+            ws.onopen = () => {
+                updateStatus(type, true);
+                log(type, "Connection established", "info");
+            };
+
+            ws.onerror = (e) => {
+                log(type, "Connection error", "alert");
+                console.error(e);
+            };
+
+            ws.onclose = () => {
+                updateStatus(type, false);
+                log(type, "Disconnected", "warning");
+                sockets[type] = null;
+            };
+
+            ws.onmessage = (event) => {
+                handleMessage(type, event.data);
+            };
+        }
+
+        function subscribe(type) {
+            if (!sockets[type] || sockets[type].readyState !== WebSocket.OPEN) {
+                log(type, "ERROR: Not connected", "alert");
+                return;
+            }
+
+            const configName = document.getElementById(type + 'Config').value;
+            
+            const payload = {
+                action: "subscribe",
+                type: type,
+                config_name: configName
+            };
+
+            sockets[type].send(JSON.stringify(payload));
+            log(type, `Subscribe request sent (config: ${configName})`, "info");
+        }
+
+        function disconnect(type) {
+            if (sockets[type]) {
+                sockets[type].close();
+            }
+        }
+
+        function handleMessage(type, rawData) {
+            try {
+                const data = JSON.parse(rawData);
+                
+                // Handle subscription confirmation
+                if (data.status === "subscribed") {
+                    log(type, `Subscribed to topic: ${data.topic}`, "info");
+                    return;
+                }
+                
+                // Handle errors
+                if (data.error) {
+                    log(type, `SERVER ERROR: ${data.error}`, "alert");
+                    return;
+                }
+                
+                // Handle payload
+                if (data.payload) {
+                    processPayload(type, data.payload);
+                } else {
+                    processPayload(type, data);
+                }
+                
+            } catch (e) {
+                log(type, `Parse error: ${e.message}`, "alert");
+            }
+        }
+
+        function processPayload(type, payload) {
+            let message = "";
+            let logType = "info";
+
+            if (type === 'speed') {
+                // speed data uses uppercase field names
+                const speed = payload.AVG_SPEED_MPS || payload.avg_speed_mps;
+                const robot = payload.ROBOT_NAME || payload.ROBOT_ID || payload.robot_name;
+                message = `Robot: ${robot} | Speed: ${speed ? speed.toFixed(2) : 'N/A'} m/s`;
+                if (speed > 2.0) logType = "alert";
+                
+            } else if (type === 'geofence') {
+                // geofence uses lowercase field names
+                const robot = payload.robot || payload.ROBOT || payload.ROBOT_ID;
+                const isAlert = (payload.msg === 'OUTSIDE' || payload.MSG === 'OUTSIDE');
+                const lat = payload.lat || payload.CURRENT_LAT || "N/A";
+                const lon = payload.lon || payload.CURRENT_LON || "N/A";
+                
+                message = `Robot: ${robot} | Status: ${payload.msg || 'ALERT'} | Pos: [${lat}, ${lon}]`;
+                if (isAlert) logType = "alert";
+                
+            } else if (type === 'humidity') {
+                // humidity uses lowercase field names
+                const robot = payload.robot || payload.ROBOT;
+                const sensor = payload.sensor || payload.SENSOR;
+                const humidity = payload.humidity || payload.HUMIDITY;
+                const dist = payload.distance_m || payload.DISTANCE_M;
+                
+                message = `ALERT: Robot ${robot} near Sensor ${sensor} | Humidity: ${humidity}% | Distance: ${dist ? Number(dist).toFixed(2) : 'N/A'}m`;
+                logType = "alert";
+                
+            } else if (type === 'collision') {
+                // collision data from python script
+                const r1 = payload.robot1_id;
+                const r2 = payload.robot2_id;
+                const dist = payload.distance_m;
+                const severity = payload.severity;
+                message = `${severity}: ${r1} <-> ${r2} | Distance: ${dist}m | Threshold: ${payload.threshold_m}m`;
+                logType = severity === 'CRITICAL' ? 'alert' : 'warning';
+            }
+
+            log(type, message, logType);
+        }
+
+        function log(type, message, logType = "info") {
+            const console = document.getElementById(type + 'Console');
+            const line = document.createElement('div');
+            line.className = `console-line ${logType}`;
+            
+            const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+            line.innerHTML = `<span class="timestamp">[${timestamp}]</span>${message}`;
+            
+            // Append to bottom (new messages go down)
+            console.appendChild(line);
+            
+            // Auto-scroll to bottom
+            console.scrollTop = console.scrollHeight;
+            
+            // Limit to 100 lines per console
+            if (console.children.length > 100) {
+                console.removeChild(console.firstChild);
+            }
+        }
+
+        function updateStatus(type, connected) {
+            const statusEl = document.getElementById(type + 'Status');
+            statusEl.className = 'status ' + (connected ? 'connected' : 'disconnected');
+        }
+    </script>
+</body>
+</html>

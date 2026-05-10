@@ -1,0 +1,74 @@
+[
+    {
+        "lat": 46.33939019406621,
+        "lon": 3.4335573507836967,
+        "expected_start": 91000,
+        "expected_end": 113300,
+        "measurements_count": 224,
+        "radius": 3.0,
+        "sensor_id": 1,
+        "behavior": "ALWAYS_HIGH",
+        "switch_lat": "46.339393315496416",
+        "switch_lon": "3.4335405854938297"
+    },
+    {
+        "lat": 46.339106476281444,
+        "lon": 3.433787568005023,
+        "expected_start": 162800,
+        "expected_end": 184600,
+        "measurements_count": 219,
+        "radius": 3.0,
+        "sensor_id": 2,
+        "behavior": "ALWAYS_LOW",
+        "switch_lat": "46.33909871399752",
+        "switch_lon": "3.4337879619189833"
+    },
+    {
+        "lat": 46.33936067854486,
+        "lon": 3.433501575495428,
+        "expected_start": 237100,
+        "expected_end": 259700,
+        "measurements_count": 227,
+        "radius": 3.0,
+        "sensor_id": 3,
+        "behavior": "SWITCH_HIGH_LOW",
+        "switch_lat": "46.33936480627924",
+        "switch_lon": "3.4334798903301156"
+    },
+    {
+        "lat": 46.33908438384804,
+        "lon": 3.4337276787228297,
+        "expected_start": 311000,
+        "expected_end": 333700,
+        "measurements_count": 228,
+        "radius": 3.0,
+        "sensor_id": 4,
+        "behavior": "SWITCH_LOW_HIGH",
+        "switch_lat": "46.33907036429497",
+        "switch_lon": "3.433725604800867"
+    },
+    {
+        "lat": 46.33933181405532,
+        "lon": 3.433438847052473,
+        "expected_start": 382100,
+        "expected_end": 404400,
+        "measurements_count": 224,
+        "radius": 3.0,
+        "sensor_id": 5,
+        "behavior": "ALWAYS_HIGH",
+        "switch_lat": "46.339335480815684",
+        "switch_lon": "3.4334223391526963"
+    },
+    {
+        "lat": 46.3393428067823,
+        "lon": 3.4334341577211354,
+        "expected_start": 383600,
+        "expected_end": 402300,
+        "measurements_count": 188,
+        "radius": 3.0,
+        "sensor_id": 6,
+        "behavior": "ALWAYS_HIGH",
+        "switch_lat": "46.33933483602554",
+        "switch_lon": "3.4334201106491045"
+    }
+]

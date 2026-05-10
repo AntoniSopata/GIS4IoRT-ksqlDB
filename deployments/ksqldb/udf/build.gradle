@@ -1,0 +1,32 @@
+plugins {
+    id 'java'
+    id "com.github.johnrengelman.shadow" version "7.1.2"
+}
+
+group 'com.gis'
+version '1.0.0'
+
+repositories {
+    mavenCentral()
+    maven { url "https://packages.confluent.io/maven" }
+}
+
+dependencies {
+    // KSQL API
+    compileOnly "io.confluent.ksql:ksqldb-udf:7.4.0"
+    
+    // JTS Core
+    implementation "org.locationtech.jts:jts-core:1.19.0"
+
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs << "-parameters"
+}
+
+shadowJar {
+    archiveBaseName = "gis-udf"
+    archiveClassifier = ""
+    mergeServiceFiles()
+}

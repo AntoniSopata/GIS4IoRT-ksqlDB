@@ -1,0 +1,255 @@
+services:
+  # Kafka Broker with KRaft
+  broker:
+    image: confluentinc/cp-kafka:8.0.0
+    container_name: broker
+    hostname: broker
+    ports:
+      - "9092:9092"
+    environment:
+      # KRaft settings
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@broker:29093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+
+      # Listener Configuration
+      KAFKA_LISTENERS: "INTERNAL://broker:29092,CONTROLLER://broker:29093,EXTERNAL://0.0.0.0:9092"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://broker:29092,EXTERNAL://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+
+      # Internal topic settings
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      
+      # Other settings
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_JMX_PORT: "9101"
+      KAFKA_JMX_HOSTNAME: "localhost"
+    healthcheck:
+      test: "cub kafka-ready -b broker:29092 1 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Schema Registry
+  schema-registry:
+    image: confluentinc/cp-schema-registry:8.0.0
+    hostname: schema-registry
+    container_name: schema-registry
+    depends_on:
+      broker:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker:29092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+
+  # Create Kafka topics
+  kafka-setup:
+    image: confluentinc/cp-kafka:8.0.0
+    hostname: kafka-setup
+    container_name: kafka-setup
+    depends_on:
+      broker:
+        condition: service_healthy
+    command: >
+      bash -c "
+        echo 'Waiting for Kafka to be ready...' &&
+        cub kafka-ready -b broker:29092 1 1 &&
+        echo 'Kafka is ready! Creating topics...' &&
+
+        kafka-topics --create --if-not-exists --topic robot_health --bootstrap-server broker:29092 --partitions 2 --replication-factor 1 --config retention.ms=3600000 &&
+        kafka-topics --create --if-not-exists --topic robot_registration --bootstrap-server broker:29092 --partitions 2 --replication-factor 1 --config cleanup.policy=compact &&
+        kafka-topics --create --if-not-exists --topic sensor_registration --bootstrap-server broker:29092 --partitions 2 --replication-factor 1 --config cleanup.policy=compact &&
+
+        kafka-topics --create --if-not-exists --topic geofence_control --bootstrap-server broker:29092 --partitions 2 --replication-factor 1 --config retention.ms=-1 &&
+        kafka-topics --create --if-not-exists --topic speed_control --bootstrap-server broker:29092 --partitions 2 --replication-factor 1 --config retention.ms=-1 &&
+        kafka-topics --create --if-not-exists --topic humidity_control --bootstrap-server broker:29092 --partitions 2 --replication-factor 1 --config retention.ms=-1 &&
+        kafka-topics --create --if-not-exists --topic collision_control --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 --config retention.ms=-1 &&
+        kafka-topics --create --if-not-exists --topic robot_selection --bootstrap-server broker:29092 --partitions 2 --replication-factor 1 --config cleanup.policy=compact &&
+
+
+
+
+
+
+
+        # SHARD SETUP
+        # 1. Create Compacted Topic
+        #kafka-topics --create --if-not-exists --topic shard_list --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 --config cleanup.policy=compact &&
+        
+        # 2. Seed Data (Using grouped echo to avoid indentation issues)
+        #echo 'Seeding shard_list...' &&
+        #(echo '0:{\"shard_id\":0, \"dummy_link\":1}' && echo '1:{\"shard_id\":1, \"dummy_link\":1}') | kafka-console-producer --bootstrap-server broker:29092 --topic shard_list --property 'parse.key=true' --property 'key.separator=:' &&
+        
+        echo 'Topics created and Shards seeded successfully.'
+      "
+
+  # ksqlDB Server (REST Interactive Mode)
+  ksqldb-server:
+    image: confluentinc/ksqldb-server:0.29.0
+    hostname: ksqldb-server
+    container_name: ksqldb-server
+    ports:
+      - "8088:8088"
+    depends_on:
+      broker:
+        condition: service_healthy
+      schema-registry:
+        condition: service_started
+      kafka-setup:
+        condition: service_completed_successfully
+    environment:
+      KSQL_BOOTSTRAP_SERVERS: "broker:29092"
+      KSQL_KSQL_SERVICE_ID: "ksqldb_service"
+      KSQL_CACHE_MAX_BYTES_BUFFERING: 0
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_REPLICATION_FACTOR: 1
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: 'true'
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: 'true'
+      KSQL_KSQL_EXTENSION_DIR: "/opt/ksqldb-udfs"
+      KSQL_CONFIG_FILE: "/etc/ksqldb/ksql-server.properties"      #KSQL_KSQL_QUERIES_FILE: "/opt/ksql-setup.sql"
+    volumes:
+      - ./ksql-setup.sql:/opt/ksql-setup.sql
+      - ./udf/build/libs/gis-udf-1.0.0.jar:/opt/ksqldb-udfs/gis-udf.jar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+# loads static setup into ksqlDB via REST API
+  ksqldb-init:
+    image: confluentinc/ksqldb-cli:0.29.0
+    container_name: ksqldb-init
+    depends_on:
+      - ksqldb-server
+    volumes:
+      - ./ksql-setup.sql:/tmp/ksql-setup.sql
+    entrypoint: >
+      bash -c "
+        echo 'Waiting for ksqlDB REST API...'
+        sleep 15
+        echo 'Sending ksql-setup.sql...'
+        ksql http://ksqldb-server:8088 -f /tmp/ksql-setup.sql
+        echo 'ksqlDB initialization complete.'
+      "
+
+# ros2_bridge service
+  ros2_bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile.ros2
+    container_name: ros2_bridge
+    depends_on:
+      broker:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts
+      - ../bags:/bags
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "broker:29092"
+    tty: true
+    stdin_open: true
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    hostname: kafka-ui
+    container_name: kafka-ui
+    ports:
+      - "8090:8080"
+    depends_on:
+      - broker
+      - schema-registry
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: broker:29092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: ksqldb_api
+    hostname: api
+    depends_on:
+      broker:
+        condition: service_healthy
+      ksqldb-server:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    environment:
+      ACTIVE_ADAPTER: "ksqldb"
+      KAFKA_BOOTSTRAP_SERVERS: "broker:29092"
+      KSQLDB_DB_NAME: "gis4iort.db"
+      ROSBAG_PATH: "/bags/rorbots_follower_leader_parcelle_1MONT_ros2"
+    volumes:
+      - ../../app:/code/app
+      - ../bags:/bags
+    restart: always
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# Collision Detection Service
+  collision-detector:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: collision-detector
+    depends_on:
+      broker:
+        condition: service_healthy
+      kafka-setup:
+        condition: service_completed_successfully
+    volumes:
+      - ./scripts:/scripts
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "broker:29092"
+    command: python3 /scripts/collision_detector.py
+    restart: unless-stopped
+
+  robot-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: robot-manager
+    depends_on:
+      broker:
+        condition: service_healthy
+      kafka-setup:
+        condition: service_completed_successfully
+      ksqldb-server:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "broker:29092"
+      PYTHONUNBUFFERED: "1"
+    command: python3 /scripts/robot_manager.py
+    restart: unless-stopped
+
+  # Python environment for producer and consumers
+  python-env:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: python-env
+    depends_on:
+      broker:
+        condition: service_healthy
+      ksqldb-server:
+        condition: service_started
+    volumes:
+      - ./scripts:/scripts
+      - ../bags:/bags
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "broker:29092"
+    tty: true
+    stdin_open: true
