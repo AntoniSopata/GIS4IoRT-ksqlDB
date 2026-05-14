@@ -24,7 +24,7 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      
+
       # Other settings
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
@@ -84,11 +84,11 @@ services:
         # SHARD SETUP
         # 1. Create Compacted Topic
         #kafka-topics --create --if-not-exists --topic shard_list --bootstrap-server broker:29092 --partitions 1 --replication-factor 1 --config cleanup.policy=compact &&
-        
+
         # 2. Seed Data (Using grouped echo to avoid indentation issues)
         #echo 'Seeding shard_list...' &&
         #(echo '0:{\"shard_id\":0, \"dummy_link\":1}' && echo '1:{\"shard_id\":1, \"dummy_link\":1}') | kafka-console-producer --bootstrap-server broker:29092 --topic shard_list --property 'parse.key=true' --property 'key.separator=:' &&
-        
+
         echo 'Topics created and Shards seeded successfully.'
       "
 
@@ -142,6 +142,27 @@ services:
         echo 'ksqlDB initialization complete.'
       "
 
+#  dispatcher:
+#    image: ros2_dispatcher
+#    build:
+#      context: /home/tony/eu/ros2_dispatcher
+#      dockerfile: /home/tony/eu/ros2_dispatcher/Dockerfile
+#    container_name: ros2_dispatcher
+#    network_mode: host
+#    ipc: host
+#    volumes:
+#      - /home/tony/eu/ros2_dispatcher/my_topics.yaml:/ros2_ws/config/my_topics.yaml
+#    environment:
+#      - DISPLAY=${DISPLAY}
+#    command: >
+#      bash -c "source /opt/ros/humble/setup.bash &&
+#               source install/setup.bash &&
+#               ros2 launch ros2_kafka_dispatcher_bringup system_minimal.launch.py
+#               selection_mode:=file
+#               selection_file_path:=/ros2_ws/config/my_topics.yaml
+#               kafka_bootstrap_servers:=localhost:9092"
+
+
 # ros2_bridge service
   ros2_bridge:
     build:
@@ -158,6 +179,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: "broker:29092"
     tty: true
     stdin_open: true
+
 
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2
