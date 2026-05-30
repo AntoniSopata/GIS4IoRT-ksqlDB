@@ -7,24 +7,9 @@ import logging
 router = APIRouter()
 logger = logging.getLogger("uvicorn.info")
 
-# Geofence is computed directly off fleet_gnss_raw (one Kafka hop). t0 is the
-# GPS header.stamp, derived inline since there is no intermediate stream.
-T0_MS = "(header->stamp->sec * 1000) + (header->stamp->nanosec / 1000000)"
-
-
 async def _update_ksqldb_geofence(robot_id: str, hex_list: list, config_names: str, ksql: KsqlDBClient):
     stream_name = f"GEOFENCE_MONITOR_{robot_id.replace('-', '_')}"
-
-    # Benchmark timestamps appended to each alert (additive; dashboard unaffected):
-    #   t0_event_ms  = GPS header.stamp (event time)
-    #   t1_ingest_ms = ROWTIME (broker ingest of ros2.fleet.gnss)
-    #   t2_ksql_ms   = wall clock when ksqlDB emits the alert
-    bench_cols = (
-        f"        {T0_MS} AS `t0_event_ms`,\n"
-        "        ROWTIME AS `t1_ingest_ms`,\n"
-        "        UNIX_TIMESTAMP() AS `t2_ksql_ms`"
-    )
-
+    
     # if disabling geofence replace stream with an empty one
     if not hex_list:
         ksql_query = f"""
@@ -32,10 +17,9 @@ async def _update_ksqldb_geofence(robot_id: str, hex_list: list, config_names: s
             KAFKA_TOPIC='robot_geofence_alerts',
             VALUE_FORMAT='JSON'
         ) AS
-        SELECT 'geofence' AS `type`, '{robot_id}' AS `robot`, robot_id, {T0_MS} AS `ts`,
-               latitude AS `lat`, longitude AS `lon`, 'OFF' AS `msg`, 'none' AS `zones`,
-{bench_cols}
-        FROM fleet_gnss_raw
+        SELECT 'geofence' AS `type`, robot_id AS `robot`, timestamp AS `ts`, 
+               latitude AS `lat`, longitude AS `lon`, 'OFF' AS `msg`, 'none' AS `zones`
+        FROM ROS_GPS_FIX_STREAM
         WHERE 1=0 EMIT CHANGES;
         """
         await ksql.execute_statement(ksql_query)
@@ -53,13 +37,12 @@ async def _update_ksqldb_geofence(robot_id: str, hex_list: list, config_names: s
         'geofence' AS `type`,
         '{robot_id}' AS `robot`,
         robot_id,
-        {T0_MS} AS `ts`,
+        timestamp AS `ts`,
         latitude AS `lat`,
         longitude AS `lon`,
         'OUTSIDE' AS `msg`,
-        '{config_names}' AS `zones`,
-{bench_cols}
-    FROM fleet_gnss_raw
+        '{config_names}' AS `zones`
+    FROM ROS_GPS_FIX_STREAM
     WHERE robot_id = '{robot_id}'
       AND INGEOFENCE(latitude, longitude, '{composite_hex}') = false
     EMIT CHANGES;
