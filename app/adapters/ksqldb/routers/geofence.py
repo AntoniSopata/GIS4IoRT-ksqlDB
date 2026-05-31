@@ -7,22 +7,24 @@ import logging
 router = APIRouter()
 logger = logging.getLogger("uvicorn.info")
 
-# Geofence is computed directly off fleet_gnss_raw (one Kafka hop). t0 is the
-# GPS header.stamp, derived inline since there is no intermediate stream.
-T0_MS = "(header->stamp->sec * 1000) + (header->stamp->nanosec / 1000000)"
+# Geofence is computed directly off fleet_gnss_raw (one Kafka hop). The
+# dispatcher stamps nanosecond timestamps in the `_ts` envelope:
+#   t0 = event time (publish), t1 = broker ingest. Both carried with ns precision.
+T0_NS = "`_ts`->t0_ns"
+T1_NS = "`_ts`->t1_ns"
 
 
 async def _update_ksqldb_geofence(robot_id: str, hex_list: list, config_names: str, ksql: KsqlDBClient):
     stream_name = f"GEOFENCE_MONITOR_{robot_id.replace('-', '_')}"
 
     # Benchmark timestamps appended to each alert (additive; dashboard unaffected):
-    #   t0_event_ms  = GPS header.stamp (event time)
-    #   t1_ingest_ms = ROWTIME (broker ingest of ros2.fleet.gnss)
-    #   t2_ksql_ms   = wall clock when ksqlDB emits the alert
+    #   t0_event_ns  = dispatcher publish (ns, from _ts envelope)
+    #   t1_ingest_ns = broker ingest of ros2.fleet.gnss (ns, from _ts envelope)
+    #   t2_ksql_ns   = wall clock when ksqlDB emits the alert (ns)
     bench_cols = (
-        f"        {T0_MS} AS `t0_event_ms`,\n"
-        "        ROWTIME AS `t1_ingest_ms`,\n"
-        "        UNIX_TIMESTAMP() AS `t2_ksql_ms`"
+        f"        {T0_NS} AS `t0_event_ns`,\n"
+        f"        {T1_NS} AS `t1_ingest_ns`,\n"
+        "        UNIX_TIMESTAMP() * 1000000 AS `t2_ksql_ns`"
     )
 
     # if disabling geofence replace stream with an empty one
@@ -32,7 +34,7 @@ async def _update_ksqldb_geofence(robot_id: str, hex_list: list, config_names: s
             KAFKA_TOPIC='robot_geofence_alerts',
             VALUE_FORMAT='JSON'
         ) AS
-        SELECT 'geofence' AS `type`, '{robot_id}' AS `robot`, robot_id, {T0_MS} AS `ts`,
+        SELECT 'geofence' AS `type`, '{robot_id}' AS `robot`, robot_id, {T0_NS} AS `ts`,
                latitude AS `lat`, longitude AS `lon`, 'OFF' AS `msg`, 'none' AS `zones`,
 {bench_cols}
         FROM fleet_gnss_raw
@@ -53,7 +55,7 @@ async def _update_ksqldb_geofence(robot_id: str, hex_list: list, config_names: s
         'geofence' AS `type`,
         '{robot_id}' AS `robot`,
         robot_id,
-        {T0_MS} AS `ts`,
+        {T0_NS} AS `ts`,
         latitude AS `lat`,
         longitude AS `lon`,
         'OUTSIDE' AS `msg`,
