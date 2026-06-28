@@ -212,7 +212,7 @@ services:
       ACTIVE_ADAPTER: "ksqldb"
       KAFKA_BOOTSTRAP_SERVERS: "broker:29092"
       KSQLDB_DB_NAME: "gis4iort.db"
-      ROSBAG_PATH: "/bags/rorbots_follower_leader_parcelle_1MONT_ros2"
+      ROSBAG_PATH: "/home/jeanluc/ros2-robot-fleet-demo/bags/rorbots_follower_leader_parcelle_1MONT_ros2/"
     volumes:
       - ../../app:/code/app
       - ../bags:/bags

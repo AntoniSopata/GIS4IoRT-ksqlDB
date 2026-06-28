@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # ksqldb
     KAFKA_BOOTSTRAP_SERVERS: str = "broker:29092"
     KSQLDB_DB_NAME: str = "gis4iort.db"
-    ROSBAG_PATH: str = "/bags/rorbots_follower_leader_parcelle_1MONT_ros2"
+    ROSBAG_PATH: str = "/home/jeanluc/ros2-robot-fleet-demo/bags/rorbots_follower_leader_parcelle_1MONT_ros2/"
     
     # nebulastream
     # TODO: Add NebulaStream config
